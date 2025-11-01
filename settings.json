@@ -1,0 +1,141 @@
+{
+  "tablespaceThreshold": 90,
+  "diskThreshold": 90,
+  "thresholds": {
+    "cpu": 90,
+    "memory": 90
+  },
+  "alertExclusions": {
+    "excludedDisks": [
+      "/boot",
+      "/var",
+      "/var/lib/docker/overlay2",
+      "/var/lib/snapd/snap/core20/2599",
+      "/var/lib/snapd/snap/core/17212",
+      "/var/lib/snapd/snap/certbot/4892",
+      "/var/lib/snapd/snap/core/17247",
+      "/var/lib/snapd/snap/certbot/4965",
+      "/var/lib/snapd/snap/core24/1151",
+      "/var/lib/snapd/snap/core20/2669",
+      "/var/lib/snapd/snap/core24/1196"
+    ],
+    "excludedOraErrors": [
+      "TNS-00505",
+      "TNS-12535",
+      "TNS-"
+    ]
+  },
+  "emailSettings": {
+    "adminEmails": [
+      "info@krizars.com"
+    ],
+    "customers": [
+      {
+        "id": "cust1",
+        "name": "HOOGLY GROUP",
+        "emails": [
+          "info@krizars.com"
+        ],
+        "databases": [
+          {
+            "id": "db1",
+            "name": "HOOGLYDB_142"
+          },
+          {
+            "id": "db2",
+            "name": "HOOGLYPROD_73"
+          }
+        ]
+      },
+      {
+        "id": "cust2",
+        "name": "TAW9EEL",
+        "emails": [
+          "info@krizars.com"
+        ],
+        "databases": [
+          {
+            "id": "db3",
+            "name": "TAW9EEL_PROD"
+          },
+          {
+            "id": "db4",
+            "name": "TAW9EEL_STANDBY"
+          }
+        ]
+      },
+      {
+        "id": "cust3",
+        "name": "ITOTAL",
+        "emails": [
+          "info@krizars.com"
+        ],
+        "databases": [
+          {
+            "id": "db5",
+            "name": "FREEDOM_PROD"
+          }
+         ]
+      },
+      {
+        "id": "cust4",
+        "name": "MADHAN",
+        "emails": [
+          "info@krizars.com"
+        ],
+        "databases": [
+          {
+            "id": "db6",
+            "name": "MADHAN_DB"
+          },
+          {
+            "id": "db7",
+            "name": "MADHAN_STANDBY"
+          }
+        ]
+      },
+      {
+        "id": "cust5",
+        "name": "DEMO_CORP",
+        "emails": [],
+        "databases": [
+          {
+            "id": "demo1",
+            "name": "DEMO_PRIMARY"
+          },
+          {
+            "id": "demo2",
+            "name": "DEMO_STANDBY"
+          }
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "email": "admin@example.com",
+      "username": "madhan",
+      "password": "madhan#2025",
+      "role": "admin"
+    },
+    {
+      "email": "user@example.com",
+      "username": "user",
+      "password": "password123",
+      "role": "user",
+      "customerIds": [
+        "cust1",
+        "cust2"
+      ]
+    },
+    {
+      "email": "demo@example.com",
+      "username": "demo",
+      "password": "demopass",
+      "role": "user",
+      "customerIds": [
+        "cust5"
+      ]
+    }
+  ]
+}

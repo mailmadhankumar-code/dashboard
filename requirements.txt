@@ -1,0 +1,5 @@
+
+requests
+oracledb
+psutil
+wmi; platform_system == "Windows"
