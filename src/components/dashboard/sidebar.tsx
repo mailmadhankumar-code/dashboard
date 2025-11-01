@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -26,7 +27,7 @@ interface DashboardSidebarProps {
     customers: Customer[];
     selectedDbId: string;
     onDbSelect: (id: string) => void;
-    alerts: Alert[]; // This type definition indicates it expects an array
+    alerts: Alert[];
     session: UserSession | null;
 }
 
@@ -49,7 +50,7 @@ export default function DashboardSidebar({
     customers,
     selectedDbId,
     onDbSelect,
-    alerts = [], // This is the crucial fix: provide a default empty array
+    alerts,
     session,
 }: DashboardSidebarProps) {
     const pathname = usePathname();
@@ -61,7 +62,6 @@ export default function DashboardSidebar({
     };
     
     const alertsByCustomer = new Map<string, Alert[]>();
-    // The forEach will now always be called on an array (either the passed alerts array or an empty array)
     alerts.forEach(alert => {
         const customerName = alert.message.split(' - ')[0];
         if (!alertsByCustomer.has(customerName)) {
@@ -167,10 +167,8 @@ export default function DashboardSidebar({
                                                     {customer.customerAlerts.map(alert => (
                                                         <SidebarMenuItem key={alert.id}>
                                                             <div className="flex items-start gap-3 p-2 text-xs">
-                                                                {/* Assuming alert.type exists based on AlertIcon usage */}
                                                                 <AlertIcon type={alert.type} />
                                                                 <div>
-                                                                    {/* Assuming alert.title exists based on usage */}
                                                                     <p className="font-semibold">{alert.title}</p>
                                                                     <p className="text-muted-foreground">{alert.message.substring(alert.message.indexOf(' - ') + 3)}</p>
                                                                 </div>

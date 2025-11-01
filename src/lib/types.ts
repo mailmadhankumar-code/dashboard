@@ -166,7 +166,7 @@ export interface UserSession {
 
 export interface Settings {
     tablespaceThreshold: number;
-    diskUsageThreshold: number;
+    diskThreshold: number;
     thresholds: {
         cpu: number;
         memory: number;
@@ -212,9 +212,6 @@ export interface DashboardData {
   topWaitEvents: WaitEvent[];
   standbyStatus: StandbyStatus[];
   customers: Customer[];
-  topCpuProcesses?: ProcessInfo[];
-  topMemoryProcesses?: ProcessInfo[];
-  topIoProcesses?: ProcessInfo[];
 }
 
 export interface OverviewRow {
