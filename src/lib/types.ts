@@ -1,4 +1,4 @@
-import { ProcessInfo } from "./process-info";
+
 
 export interface Database {
   id: string;
@@ -119,15 +119,8 @@ export interface Alert {
 }
 
 export interface OsInfo {
-  platform: string;
-  release: string;
-  uptime: string;
-  totalCpu: number;
-  totalMemory: number;
-  topCpuProcesses: ProcessInfo[];
-  topMemoryProcesses: ProcessInfo[];
-  topNetworkProcesses: ProcessInfo[];
-  topIoProcesses?: ProcessInfo[];
+    platform: string;
+    release: string;
 }
 
 export interface StandbyStatus {
@@ -187,7 +180,6 @@ export interface DashboardData {
   timestamp: string;
   dbIsUp: boolean;
   dbStatus: string;
-  dbUptime?: string; 
   osIsUp: boolean;
   osInfo?: OsInfo;
   kpis: Kpi;
@@ -213,23 +205,6 @@ export interface DashboardData {
   standbyStatus: StandbyStatus[];
   customers: Customer[];
 }
-
-export interface OverviewRow {
-    id: string;
-    dbName: string;
-    customerName: string;
-    dbIsUp: boolean;
-    osIsUp: boolean;
-    dbStatus: string;
-    cpuUsage: number;
-    memoryUsage: number;
-    activeSessions: number;
-    uptime: string;
-}
-
-export type ApiDataResponse = DashboardData & {
-    dbUptime?: string;
-}; 
 
 // This is the shape of the data coming from the /data endpoint
 export type ServerDataPayload = {

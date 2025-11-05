@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getSession } from '@/lib/server/session';
 
-const protectedRoutes = ['/overview', '/settings'];
+const protectedRoutes = ['/', '/settings'];
 const publicRoutes = ['/login'];
 
 export async function middleware(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
   
   // Determine if the current path is a protected route.
   // The root path needs to be checked for an exact match.
-  const isProtectedRoute = path === '/overview' || protectedRoutes.some(p => p !== '/overview' && path.startsWith(p));
+  const isProtectedRoute = path === '/' || protectedRoutes.some(p => p !== '/' && path.startsWith(p));
 
   // 1. Get and decrypt the session
   const session = await getSession();
@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
 
   // 3. Redirect to dashboard if user is authenticated and trying to access the login page
   if (path === '/login' && session) {
-     return NextResponse.redirect(new URL('/overview', request.nextUrl));
+     return NextResponse.redirect(new URL('/', request.nextUrl));
   }
   
   return NextResponse.next();

@@ -41,9 +41,11 @@ export default function LoginPage() {
   const { session, isLoading: isSessionLoading, revalidate } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // This effect will run when the session state changes.
+  // If a session becomes available (i.e., login was successful), it redirects.
   useEffect(() => {
     if (!isSessionLoading && session) {
-      router.push("/overview");
+      router.push("/");
     }
   }, [session, isSessionLoading, router]);
 
@@ -73,6 +75,8 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Redirecting to your dashboard...",
       });
+      // After a successful login, tell the useSession hook to re-check the session.
+      // This will trigger the useEffect above to redirect the user.
       await revalidate();
 
     } catch (error: any) {
@@ -86,6 +90,9 @@ export default function LoginPage() {
     }
   }
   
+  // If we are on the login page, we should not show a loading spinner,
+  // as the middleware should have already handled redirection for logged-in users.
+  // We only show a spinner if a login attempt is in progress.
   if (isSessionLoading && session === undefined) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -96,6 +103,7 @@ export default function LoginPage() {
         </div>
     );
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -139,6 +147,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>Password</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="********" {...field} disabled={isSubmitting} />
                     </FormControl>
@@ -147,16 +156,11 @@ export default function LoginPage() {
                 )}
               />
             </CardContent>
-            <CardFooter className="flex-col items-stretch gap-y-4">
-                 <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign In
-                </Button>
-                 <div className="text-center text-sm text-muted-foreground p-4 bg-muted rounded-lg">
-                    <p className="font-semibold mb-2 text-foreground">Demo Credentials</p>
-                    <p>Username: <span className="font-mono">demo</span></p>
-                    <p>Password: <span className="font-mono">demopass</span></p>
-                </div>
+            <CardFooter>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Sign In
+              </Button>
             </CardFooter>
           </form>
         </Form>

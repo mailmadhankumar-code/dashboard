@@ -101,3 +101,6 @@ export async function saveSettings(settings: Settings): Promise<void> {
         console.error("Error saving settings file:", error);
     }
 }
+
+// Ensure the settings file exists on startup if it doesn't
+getSettings();
