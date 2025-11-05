@@ -3,6 +3,7 @@ import requests
 import json
 import time
 import platform
+import psutil # Import the psutil library
 from datetime import datetime, timedelta, timezone
 import re
 
@@ -18,16 +19,20 @@ DB_CONNECT_AS_SYSDBA = False
 
 
 # This would typically be constructed from the variables above.
+# Example for oracledb library: dsn = f"{DB_HOST}:{DB_PORT}/{DB_SERVICE_NAME}"
 DB_CONNECTION_STRING = f"{DB_USER}/{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_SERVICE_NAME}"
 
 
 # --- Agent & Server Configuration ---
 SERVER_URL = "https://9000-firebase-proactivedb-1761776452727.cluster-uodogxybdfdkiqhne5y6pr6j4w.cloudworkstations.dev/api/report"
-DB_SERVER_ID = "db6"
+
+DB_SERVER_ID = "db6" # Changed from db6 to match demo data
 DB_NAME="PROD_CRM" # Added for better alert identification
 FREQUENCY_SECONDS = 30
 
 # --- State for I/O counters ---
+# psutil.disk_io_counters returns cumulative values, so we need to store the previous state
+# to calculate the rate of change.
 previous_io_counters = None
 previous_io_timestamp = None
 previous_net_io_counters = None
@@ -76,6 +81,25 @@ def get_psutil():
         print("Error: The 'psutil' package is not installed. Please install it using 'pip install psutil'")
         return None
 
+def format_uptime(seconds):
+    """Converts seconds into a human-readable format (e.g., '2 days, 4 hours, 30 minutes')."""
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
+    
+    parts = []
+    if d > 0:
+        parts.append(f"{int(d)} day{'s' if d > 1 else ''}")
+    if h > 0:
+        parts.append(f"{int(h)} hour{'s' if h > 1 else ''}")
+    if m > 0:
+        parts.append(f"{int(m)} minute{'s' if m > 1 else ''}")
+
+    if not parts:
+        return f"{int(s)} seconds"
+        
+    return ", ".join(parts)
+
 def collect_real_data(connection, psutil):
     """
     Executes SQL queries and uses psutil to collect performance metrics.
@@ -87,18 +111,25 @@ def collect_real_data(connection, psutil):
 
     db_is_up = False
     db_status = "UNKNOWN"
+    db_uptime = "N/A"
+
     if connection:
         try:
             connection.ping()
             db_is_up = True
             cursor_check = connection.cursor()
             try:
-                cursor_check.execute("SELECT status FROM V$INSTANCE")
-                status_result = cursor_check.fetchone()
+                # Fetch DB status and startup time
+                cursor_check.execute("SELECT status, startup_time FROM V$INSTANCE")
+                status_result, startup_time_result = cursor_check.fetchone()
                 if status_result:
-                    db_status = status_result[0]
-            except Exception:
+                    db_status = status_result
+                if startup_time_result:
+                    uptime_delta = datetime.now() - startup_time_result
+                    db_uptime = format_uptime(uptime_delta.total_seconds())
+            except Exception as e:
                 db_status = "READ"
+                print(f"Could not get full DB status, likely read-only standby. Error: {e}")
             finally:
                 cursor_check.close()
         except Exception as e:
@@ -110,11 +141,22 @@ def collect_real_data(connection, psutil):
     os_info = None
     host_memory = {}
     if psutil:
-        os_info = {
-            "platform": platform.system(),
-            "release": platform.release(),
-            "hostname": platform.node()
-        }
+        try:
+            uptime_seconds = time.time() - psutil.boot_time()
+            os_info = {
+                "platform": platform.system(),
+                "release": platform.release(),
+                "hostname": platform.node(),
+                "uptime": format_uptime(uptime_seconds)
+            }
+        except Exception as e:
+            print(f"Error collecting OS uptime: {e}")
+            os_info = {
+                "platform": platform.system(),
+                "release": platform.release(),
+                "hostname": platform.node(),
+                "uptime": f"Error: {e}"
+            }
         mem = psutil.virtual_memory()
         host_memory = {
             "total": round(mem.total / (1024**3), 2),
@@ -145,7 +187,8 @@ def collect_real_data(connection, psutil):
 
     if cursor and db_status == "OPEN":
         try:
-            kpi_results = execute_query("SELECT count(*) FROM v$session WHERE status = 'ACTIVE' AND type = 'USER' AND username IS NOT NULL")
+            kpi_query = "SELECT count(*) FROM v$session WHERE status = 'ACTIVE' AND type = 'USER' AND username IS NOT NULL"
+            kpi_results = execute_query(kpi_query)
             if kpi_results:
                kpis["activeSessions"] = kpi_results[0][0]
         except PermissionError:
@@ -207,6 +250,7 @@ def collect_real_data(connection, psutil):
         "timestamp": now.isoformat(),
         "dbIsUp": db_is_up,
         "dbStatus": db_status,
+        "dbUptime": db_uptime,
         "osIsUp": psutil is not None,
         "osInfo": os_info,
         "host_memory": host_memory,
@@ -221,12 +265,13 @@ def collect_real_data(connection, psutil):
         "backups": backups,
         "activeSessions": activeSessions,
         "detailedActiveSessions": detailedActiveSessions,
-        "activeSessionsHistory": activeSessionsHistory,
+        "activeSessionsHistory": activeSessionsHistory, # This is now populated by the backend
         "alertLog": alertLog,
         "diskUsage": diskUsage,
         "topWaitEvents": topWaitEvents,
         "standbyStatus": standbyStatus
     }
+
 
 def send_data(data):
     """Sends data to the central server."""
@@ -255,11 +300,14 @@ def main():
         while True:
             # Reconnect logic
             if connection:
-                try: connection.ping()
+                try:
+                    connection.ping()
                 except Exception:
                     print("Connection ping failed. Will attempt to reconnect.")
-                    try: connection.close()
-                    except Exception: pass
+                    try:
+                        connection.close()
+                    except Exception:
+                        pass
                     connection = None
             
             if not connection:
@@ -270,8 +318,10 @@ def main():
                 send_data(data)
             
             if not data.get("dbIsUp", False) and connection:
-                try: connection.close()
-                finally: connection = None
+                try:
+                    connection.close()
+                finally:
+                    connection = None
             
             print(f"\n--- Waiting for {FREQUENCY_SECONDS} seconds ---\n")
             time.sleep(FREQUENCY_SECONDS)
