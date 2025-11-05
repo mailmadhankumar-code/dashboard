@@ -1,15 +1,22 @@
 
 import { NextResponse } from "next/server";
-import { storePerformanceMetrics, updateLatestServerData } from "@/lib/server/db";
+import { getSettings } from "@/lib/server/settings";
+import { storePerformanceMetrics, updateServerData, getDb } from "@/lib/server/db";
 import { DashboardData } from "@/lib/types";
+
 
 export async function POST(request: Request) {
   try {
+    // Initialize the database connection (this will also create and seed the DB if it doesn't exist)
+    await getDb();
+    
     const raw_data = (await request.json());
     
     // --- Data Type Coercion ---
+    // Ensure numeric fields are correctly typed, especially from JSON
     const data: DashboardData = {
         ...raw_data,
+        dbUptime: raw_data.dbUptime || "N/A",
         backups: (raw_data.backups || []).map((b: any) => ({
             ...b,
             input_bytes: b.input_bytes ? Number(b.input_bytes) : 0,
@@ -27,14 +34,19 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    
+    // --- Update Server Data in SQLite ---
+    await updateServerData(server_id, data);
 
-    // --- Store latest full snapshot in the database ---
-    await updateLatestServerData(data);
-
-    // --- Store historical performance data for charts ---
+    // --- Store historical performance data in SQLite ---
     await storePerformanceMetrics(server_id, timestamp, data);
     
-    console.log(`[${new Date().toISOString()}] Successfully processed and stored data for agent: ${server_id}`);
+    // --- Process Alerts (optional) ---
+    // const settings = await getSettings();
+    // const alertManager = new AlertManager(settings);
+    // await alertManager.process_alerts(server_id, data);
+    
+    console.log(`[${new Date().toISOString()}] Received data from agent: ${server_id}`);
     return NextResponse.json({ status: "success", id: server_id }, { status: 201 });
 
   } catch (error) {

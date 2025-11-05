@@ -14,33 +14,17 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
-import { ProcessInfo } from "@/lib/types";
+import { ProcessInfo } from "@/lib/process-info";
 import { ColumnDef } from "@tanstack/react-table";
+import { FixedSizeList as List } from 'react-window';
 
-// Defines the columns for the process data tables.
-export const columns: ColumnDef<ProcessInfo>[] = [
+const columns: ColumnDef<ProcessInfo>[] = [
     { accessorKey: "pid", header: "PID" },
     { accessorKey: "name", header: "Name" },
-    { 
-        accessorKey: "cpu_usage", 
-        header: "CPU %",
-        cell: ({ row }) => `${row.original.cpu_usage?.toFixed(2) ?? 0}`
-    },
-    {
-        accessorKey: "memory_mb",
-        header: "Memory (MB)",
-        cell: ({ row }) => `${row.original.memory_mb?.toFixed(2) ?? 0}`
-    },
-    {
-        accessorKey: "read_mb",
-        header: "Read (MB)",
-        cell: ({ row }) => `${row.original.read_mb?.toFixed(2) ?? 0}`
-    },
-    {
-        accessorKey: "write_mb",
-        header: "Write (MB)",
-        cell: ({ row }) => `${row.original.write_mb?.toFixed(2) ?? 0}`
-    },
+    { accessorKey: "cpu_usage", header: "CPU %" },
+    { accessorKey: "memory_mb", header: "Memory (MB)" },
+    { accessorKey: "read_mb", header: "Read (MB)" },
+    { accessorKey: "write_mb", header: "Write (MB)" },
     { accessorKey: "username", header: "Username" },
 ];
 
@@ -48,50 +32,103 @@ interface TopProcessesCardProps {
   topCpuProcesses: ProcessInfo[] | undefined;
   topMemoryProcesses: ProcessInfo[] | undefined;
   topIoProcesses: ProcessInfo[] | undefined;
+  topNetworkProcesses: ProcessInfo[] | undefined;
 }
 
-/**
- * A card component that displays top processes categorized by CPU, Memory, and I/O usage.
- * It uses tabs to switch between the different categories and a reusable DataTable to display the data.
- */
-export function TopProcessesCard({ topCpuProcesses, topMemoryProcesses, topIoProcesses }: TopProcessesCardProps) {
+const ProcessRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: ProcessInfo[] }) => {
+  const process = data[index];
   return (
-    <Card className="col-span-1 lg:col-span-2">
+    <div style={style} className="flex items-center justify-between">
+      <span>{process.pid}</span>
+      <span>{process.name}</span>
+      <span>{process.cpu_usage}</span>
+      <span>{process.memory_mb}</span>
+      <span>{process.read_mb}</span>
+      <span>{process.write_mb}</span>
+      <span>{process.username}</span>
+    </div>
+  );
+};
+
+export const TopProcessesCard: React.FC<TopProcessesCardProps> = ({
+  topCpuProcesses,
+  topMemoryProcesses,
+  topIoProcesses,
+  topNetworkProcesses,
+}) => {
+  return (
+    <Card>
       <CardHeader>
         <CardTitle>Top Processes</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="cpu">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="cpu">Top CPU</TabsTrigger>
             <TabsTrigger value="memory">Top Memory</TabsTrigger>
             <TabsTrigger value="io">Top I/O</TabsTrigger>
+            <TabsTrigger value="network">Top Network</TabsTrigger>
           </TabsList>
-          
           <TabsContent value="cpu">
-            {topCpuProcesses && topCpuProcesses.length > 0 ? (
-              <DataTable columns={columns} data={topCpuProcesses} />
+            {topCpuProcesses ? (
+              <List
+                height={400}
+                itemCount={topCpuProcesses.length}
+                itemSize={35}
+                width="100%"
+                itemData={topCpuProcesses}
+              >
+                {ProcessRow}
+              </List>
             ) : (
-              <p className="text-center py-8">No CPU process data available.</p>
+              <p>No CPU process data available.</p>
             )}
           </TabsContent>
-          
           <TabsContent value="memory">
-            {topMemoryProcesses && topMemoryProcesses.length > 0 ? (
-              <DataTable columns={columns} data={topMemoryProcesses} />
+            {topMemoryProcesses ? (
+              <List
+                height={400}
+                itemCount={topMemoryProcesses.length}
+                itemSize={35}
+                width="100%"
+                itemData={topMemoryProcesses}
+              >
+                {ProcessRow}
+              </List>
             ) : (
-              <p className="text-center py-8">No memory process data available.</p>
+              <p>No memory process data available.</p>
             )}
           </TabsContent>
-          
           <TabsContent value="io">
-            {topIoProcesses && topIoProcesses.length > 0 ? (
-              <DataTable columns={columns} data={topIoProcesses} />
+            {topIoProcesses ? (
+              <List
+                height={400}
+                itemCount={topIoProcesses.length}
+                itemSize={35}
+                width="100%"
+                itemData={topIoProcesses}
+              >
+                {ProcessRow}
+              </List>
             ) : (
-              <p className="text-center py-8">No I/O process data available.</p>
+              <p>No I/O process data available.</p>
             )}
           </TabsContent>
-
+          <TabsContent value="network">
+            {topNetworkProcesses ? (
+              <List
+                height={400}
+                itemCount={topNetworkProcesses.length}
+                itemSize={35}
+                width="100%"
+                itemData={topNetworkProcesses}
+              >
+                {ProcessRow}
+              </List>
+            ) : (
+              <p>No network process data available.</p>
+            )}
+          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
