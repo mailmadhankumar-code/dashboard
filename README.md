@@ -1,4 +1,3 @@
-    This is generally the cleanest solution as it makes the component more robust and self-contained. You might also want to adjust your `DashboardSidebarProps` interface to reflect that `alerts` is optional or always an array.
 # ProactiveDB Insights
 
 This is a centralized dashboard for monitoring Oracle databases, built with Next.js and a Python data collection agent.
