@@ -1,4 +1,3 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -30,6 +29,13 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Exclude sqlite3 from the client-side bundle
+      config.externals.push('sqlite3');
+    }
+    return config;
   },
 };
 

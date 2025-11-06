@@ -74,15 +74,28 @@
           {
             "id": "db5",
             "name": "FREEDOM_PROD"
-          },
+          }
+         ]
+      },
+      {
+        "id": "cust4",
+        "name": "MADHAN",
+        "emails": [
+          "info@krizars.com"
+        ],
+        "databases": [
           {
             "id": "db6",
-            "name": "FREEDOM_STANDBY"
+            "name": "MADHAN_DB"
+          },
+          {
+            "id": "db7",
+            "name": "MADHAN_STANDBY"
           }
         ]
       },
       {
-        "id": "cust4",
+        "id": "cust5",
         "name": "DEMO_CORP",
         "emails": [],
         "databases": [
@@ -115,31 +128,13 @@
         "cust2"
       ]
     },
-   {
-      "email": "user@example.com",
-      "username": "itotal",
-      "password": "itotal#2025",
-      "role": "user",
-      "customerIds": [
-        "cust3"
-      ]
-    },
-   {
-      "email": "user@example.com",
-      "username": "taw9eel",
-      "password": "taw9eel#2025",
-      "role": "user",
-      "customerIds": [
-        "cust2"
-      ]
-    },
     {
       "email": "demo@example.com",
       "username": "demo",
-      "password": "demo",
+      "password": "demopass",
       "role": "user",
       "customerIds": [
-        "cust4"
+        "cust5"
       ]
     }
   ]
