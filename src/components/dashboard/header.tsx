@@ -12,9 +12,10 @@ interface DashboardHeaderProps {
   kpis: Kpi;
   selectedDb: (DbType & { dbStatus?: string }) | undefined;
   osInfo: OsInfo | undefined;
+  dbUptime: string | undefined;
 }
 
-export default function DashboardHeader({ kpis, selectedDb, osInfo }: DashboardHeaderProps) {
+export default function DashboardHeader({ kpis, selectedDb, osInfo, dbUptime }: DashboardHeaderProps) {
     const { open, setOpen } = useSidebar();
 
   return (
@@ -31,7 +32,7 @@ export default function DashboardHeader({ kpis, selectedDb, osInfo }: DashboardH
             </Button>
         </div>
 
-      <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 md:gap-4">
+      <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-7 md:gap-4">
         <div className="col-span-2 sm:col-span-1 md:col-span-2">
             <KpiCard
               title="Database"
@@ -54,7 +55,7 @@ export default function DashboardHeader({ kpis, selectedDb, osInfo }: DashboardH
         <KpiCard
           title="DB Active Sessions"
           value={kpis.activeSessions.toString()}
-          icon={<Users className_="text-accent" />}
+          icon={<Users className="text-accent" />}
         />
          <KpiCard
           title="OS Platform"
@@ -66,6 +67,11 @@ export default function DashboardHeader({ kpis, selectedDb, osInfo }: DashboardH
           title="OS Uptime"
           value={osInfo?.uptime || 'N/A'}
           icon={<Timer className="text-accent" />}
+        />
+        <KpiCard
+            title="DB Uptime"
+            value={dbUptime || 'N/A'}
+            icon={<Timer className="text-accent" />}
         />
       </div>
     </header>

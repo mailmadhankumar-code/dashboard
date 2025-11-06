@@ -1,24 +1,19 @@
-
 import React from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { GlassCard, CardHeader, CardTitle, CardContent, CardDescription } from "./glass-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AlertLogEntry } from "@/lib/types";
 
 interface AlertLogCardProps {
-  // The data prop can be undefined, so we need to handle that.
-  data: AlertLogEntry[] | undefined;
+  alerts: AlertLogEntry[];
 }
 
-export default function AlertLogCard({ data }: AlertLogCardProps) {
-  // If data is undefined or null, default to an empty array to prevent crashes.
-  const alerts = data || [];
-
+export default function AlertLogCard({ alerts }: AlertLogCardProps) {
   return (
-    <Card>
+    <GlassCard>
       <CardHeader>
-        <CardTitle>Alert Log</CardTitle>
-        <CardDescription>Critical errors from the database alert log.</CardDescription>
+        <CardTitle>Alert Log Errors</CardTitle>
+        <CardDescription>ORA- errors from the last hour.</CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-64">
@@ -26,30 +21,20 @@ export default function AlertLogCard({ data }: AlertLogCardProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Timestamp</TableHead>
-                <TableHead>Error Code</TableHead>
+                <TableHead>Error</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {alerts.length > 0 ? (
-                alerts.map((alert) => (
-                  // Using alert.id as the key, which is a stable identifier.
-                  <TableRow key={alert.id}>
-                    <TableCell>{new Date(alert.timestamp).toLocaleString()}</TableCell>
-                    <TableCell className="font-mono font-bold text-red-500">{alert.error_code}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                // Display a user-friendly message when there are no alerts.
-                <TableRow>
-                  <TableCell colSpan={2} className="text-center">
-                    No new alerts in the log.
-                  </TableCell>
+              {alerts.map((alert) => (
+                <TableRow key={alert.id}>
+                  <TableCell>{alert.timestamp}</TableCell>
+                  <TableCell className="font-mono font-bold text-red-400">{alert.error_code}</TableCell>
                 </TableRow>
-              )}
+              ))}
             </TableBody>
           </Table>
         </ScrollArea>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }
