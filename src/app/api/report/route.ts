@@ -1,18 +1,22 @@
 
 import { NextResponse } from "next/server";
 import { getSettings } from "@/lib/server/settings";
-import { storePerformanceMetrics, db_data_store } from "@/lib/server/db";
-import { AlertManager } from "@/lib/server/alert-manager";
+import { storePerformanceMetrics, updateServerData, getDb } from "@/lib/server/db";
 import { DashboardData } from "@/lib/types";
+
 
 export async function POST(request: Request) {
   try {
+    // Initialize the database connection (this will also create and seed the DB if it doesn't exist)
+    await getDb();
+    
     const raw_data = (await request.json());
     
     // --- Data Type Coercion ---
     // Ensure numeric fields are correctly typed, especially from JSON
     const data: DashboardData = {
         ...raw_data,
+        dbUptime: raw_data.dbUptime || "N/A",
         backups: (raw_data.backups || []).map((b: any) => ({
             ...b,
             input_bytes: b.input_bytes ? Number(b.input_bytes) : 0,
@@ -30,21 +34,17 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    
+    // --- Update Server Data in SQLite ---
+    await updateServerData(server_id, data);
 
-    // --- Store historical performance data ---
+    // --- Store historical performance data in SQLite ---
     await storePerformanceMetrics(server_id, timestamp, data);
     
-
-    // --- Store the latest full snapshot in memory ---
-    db_data_store[server_id] = {
-      data: data,
-      last_updated: new Date().toISOString(),
-    };
-
-    // --- Process Alerts ---
-    const settings = await getSettings();
-    const alertManager = new AlertManager(settings);
-    await alertManager.process_alerts(server_id, data);
+    // --- Process Alerts (optional) ---
+    // const settings = await getSettings();
+    // const alertManager = new AlertManager(settings);
+    // await alertManager.process_alerts(server_id, data);
     
     console.log(`[${new Date().toISOString()}] Received data from agent: ${server_id}`);
     return NextResponse.json({ status: "success", id: server_id }, { status: 201 });

@@ -22,9 +22,39 @@ const SMTP_CONFIG = {
 };
 const SMTP_SENDER = process.env.SMTP_SENDER || "noreply@proactivedb.com";
 
+// --- Cleanup Configuration for Debounce Store ---
+const DEBOUNCE_CLEANUP_INTERVAL_HOURS = 6;
+const DEBOUNCE_STALE_THRESHOLD_HOURS = 48; // Entries older than this will be removed
+
+function cleanupStaleDebounceEntries() {
+  const now = new Date();
+  let cleaned_count = 0;
+  console.log(`[AlertManager] Running cleanup of stale debounce entries...`);
+  for (const key in alert_debounce_store) {
+    if (Object.prototype.hasOwnProperty.call(alert_debounce_store, key)) {
+      const entry = alert_debounce_store[key];
+      const diffHours = (now.getTime() - entry.timestamp.getTime()) / (1000 * 60 * 60);
+      if (diffHours > DEBOUNCE_STALE_THRESHOLD_HOURS) {
+        delete alert_debounce_store[key];
+        cleaned_count++;
+      }
+    }
+  }
+  if (cleaned_count > 0) {
+      console.log(`[AlertManager] Cleaned up ${cleaned_count} stale debounce entries.`);
+  }
+}
+
+// Start a periodic cleanup task for the debounce store
+if (process.env.NODE_ENV !== 'test') { // Don't run timers in test environments
+    setInterval(cleanupStaleDebounceEntries, DEBOUNCE_CLEANUP_INTERVAL_HOURS * 60 * 60 * 1000);
+    // Run once on startup as well
+    cleanupStaleDebounceEntries();
+}
+
 
 export class AlertManager {
-    private settings: Settings;
+    public settings: Settings;
     private transporter: nodemailer.Transporter;
 
     constructor(settings: Settings) {

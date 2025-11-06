@@ -1,8 +1,8 @@
 
 "use client";
 
-import React from "react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import React, { useState } from "react";
+import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "./sidebar";
 import type { Customer, Alert, UserSession } from "@/lib/types";
 
@@ -23,16 +23,29 @@ export default function DashboardLayout({
   alerts,
   session
 }: DashboardLayoutProps) {
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   return (
     <SidebarProvider>
-      <DashboardSidebar
-        customers={customers}
-        selectedDbId={selectedDbId}
-        onDbSelect={onDbSelect}
-        alerts={alerts}
-        session={session}
-      />
-      <SidebarInset>{children}</SidebarInset>
+        <div className="flex h-screen bg-background">
+            <Sidebar open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                <DashboardSidebar
+                    customers={customers}
+                    selectedDbId={selectedDbId}
+                    onDbSelect={onDbSelect}
+                    alerts={alerts}
+                    session={session}
+                />
+            </Sidebar>
+
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <main className="flex-1 overflow-y-auto">
+                    <SidebarInset>
+                        {children}
+                    </SidebarInset>
+                </main>
+            </div>
+        </div>
     </SidebarProvider>
   );
 }
