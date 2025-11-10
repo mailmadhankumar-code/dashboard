@@ -25,12 +25,10 @@ import DiskUsageCard from "@/components/dashboard/disk-usage-card";
 import TopWaitEventsCard from "@/components/dashboard/top-wait-events-card";
 import ActiveSessionHistoryCard from "@/components/dashboard/active-session-history-card";
 import StandbyStatusCard from "@/components/dashboard/standby-status-card";
-import { TopProcessesCard } from "@/components/dashboard/top-processes-card";
 import { toast } from "@/hooks/use-toast";
 import { useSession } from "@/hooks/use-session";
 import { DEMO_DATA_PAYLOAD } from "@/lib/demo-data";
 import { deepCopy } from "@/lib/utils";
-import { getSettingsAction } from "@/app/actions"; // Import the server action
 
 type StatusPayload = {
     [key: string]: {
@@ -128,9 +126,9 @@ export default function Home() {
       const currentIsDemoMode = userSession.username === 'demo';
 
       try {
-        const settingsResult = await getSettingsAction();
-        if (settingsResult.error || !settingsResult.data) throw new Error(settingsResult.error || 'Failed to fetch settings');
-        const settingsData: Settings = settingsResult.data;
+        const settingsResponse = await fetch('/api/settings');
+        if (!settingsResponse.ok) throw new Error('Failed to fetch settings');
+        const settingsData: Settings = await settingsResponse.json();
         setSettings(settingsData);
         
         const allCustomers = settingsData?.emailSettings?.customers || [];
@@ -273,6 +271,7 @@ export default function Home() {
   
   const selectedDbInfo: Partial<Database> & { osType?: string; dbStatus?: string } = {
       ...(customers.flatMap(c => c.databases).find(db => db.id === selectedDbId) || {}),
+      osType: selectedDbData?.osInfo?.platform || 'N/A',
       dbStatus: selectedDbData?.dbStatus || 'UNKNOWN'
   };
 
@@ -303,25 +302,11 @@ export default function Home() {
           <IoCard readData={selectedDbData.performance?.io_read} writeData={selectedDbData.performance?.io_write} diskUsage={selectedDbData.diskUsage} />
           <NetworkCard upData={selectedDbData.performance?.network_up} downData={selectedDbData.performance?.network_down} />
           <div className="md:col-span-2 lg:col-span-4">
-            <TopProcessesCard
-              topCpuProcesses={selectedDbData.osInfo?.topCpuProcesses}
-              topMemoryProcesses={selectedDbData.osInfo?.topMemoryProcesses}
-              topIoProcesses={selectedDbData.osInfo?.topIoProcesses}
-              topNetworkProcesses={selectedDbData.osInfo?.topNetworkProcesses}
-            />
-          </div>
-          <div className="md:col-span-2 lg:col-span-4">
               <DetailedActiveSessionsCard sessions={selectedDbData.detailedActiveSessions} />
           </div>
-          <div className="md:col-span-2 lg:col-span-2">
-            <TablespacesCard tablespaces={selectedDbData.tablespaces} threshold={settings?.tablespaceThreshold} />
-          </div>
-          <div className="md:col-span-2 lg:col-span-2">
-            <DiskUsageCard diskUsage={selectedDbData.diskUsage} threshold={settings?.diskThreshold} />
-          </div>
-          <div className="md:col-span-2 lg:col-span-4">
-            <AlertLogCard alerts={selectedDbData.alertLog} />
-          </div>
+          <TablespacesCard tablespaces={selectedDbData.tablespaces} threshold={settings?.tablespaceThreshold} />
+          <AlertLogCard alerts={selectedDbData.alertLog} />
+          <DiskUsageCard diskUsage={selectedDbData.diskUsage} threshold={settings?.diskThreshold} />
           <div className="md:col-span-2 lg:col-span-4">
               <RmanBackupsCard backups={selectedDbData.backups} />
           </div>
@@ -342,12 +327,10 @@ export default function Home() {
       alerts={alerts}
       session={session}
     >
-      <DashboardHeader 
-        kpis={selectedDbData?.kpis || {cpuUsage: 0, memoryUsage: 0, activeSessions: 0}}
-        selectedDb={selectedDbInfo} 
-        osInfo={selectedDbData?.osInfo}
-      />
+      <DashboardHeader kpis={selectedDbData?.kpis || {cpuUsage: 0, memoryUsage: 0, activeSessions: 0}} selectedDb={selectedDbInfo} />
       {renderContent()}
     </DashboardLayout>
   );
 }
+
+    

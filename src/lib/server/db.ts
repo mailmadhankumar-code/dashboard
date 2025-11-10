@@ -1,67 +1,27 @@
 
 import sqlite3 from "sqlite3";
 import { open, Database } from "sqlite";
-import { subHours, formatISO } from "date-fns";
+import { subHours, formatISO, parse } from "date-fns";
 import { DashboardData, PerformanceData, TimeSeriesData, WaitEvent } from "@/lib/types";
-import { generateMockDashboardData, generateHistoricPerformanceData } from "@/lib/server/db/mock-data";
 
-// --- CONFIGURATION ---
-const DB_FILE = "dashboard_data.sqlite";
+const HISTORY_DB_FILE = "performance_history.sqlite";
 
-// --- GLOBALS ---
+// Singleton instance for the database
 let db: Database<sqlite3.Database, sqlite3.Statement> | null = null;
 
-// --- DATABASE INITIALIZATION ---
-
-/**
- * Gets a singleton database instance.
- */
-async function getDb(): Promise<Database> {
+async function getDb() {
   if (!db) {
     db = await open({
-      filename: DB_FILE,
+      filename: HISTORY_DB_FILE,
       driver: sqlite3.Database,
     });
-    await initializeDatabase(db);
+    await init_history_db(db);
   }
   return db;
 }
 
-/**
- * Sets up the required database tables and indices.
- * This now includes the primary 'servers' table for the latest snapshot data.
- */
-async function initializeDatabase(dbInstance: Database): Promise<void> {
-    console.log("--- SERVER: Initializing database schema... ---");
 
-    // 1. Table for the latest server data snapshot
-    await dbInstance.exec(`
-        CREATE TABLE IF NOT EXISTS servers (
-            id TEXT PRIMARY KEY,
-            dbName TEXT,
-            last_updated TEXT,
-            dbIsUp BOOLEAN,
-            dbStatus TEXT,
-            osIsUp BOOLEAN,
-            osInfo TEXT,
-            host_memory TEXT,
-            kpis TEXT,
-            topCpuProcesses TEXT,
-            topMemoryProcesses TEXT,
-            topIoProcesses TEXT,
-            topNetworkProcesses TEXT,
-            diskUsage TEXT,
-            tablespaces TEXT,
-            backups TEXT,
-            activeSessions TEXT,
-            detailedActiveSessions TEXT,
-            alertLog TEXT,
-            topWaitEvents TEXT,
-            standbyStatus TEXT
-        );
-    `);
-    
-    // 2. Table for historical performance summaries (for charts)
+async function init_history_db(dbInstance: Database) {
     await dbInstance.exec(`
         CREATE TABLE IF NOT EXISTS performance_summary (
             server_id TEXT,
@@ -76,8 +36,6 @@ async function initializeDatabase(dbInstance: Database): Promise<void> {
             PRIMARY KEY (server_id, timestamp)
         );
     `);
-
-    // 3. Table for historical I/O details
     await dbInstance.exec(`
         CREATE TABLE IF NOT EXISTS performance_io_details (
             server_id TEXT,
@@ -89,178 +47,226 @@ async function initializeDatabase(dbInstance: Database): Promise<void> {
             PRIMARY KEY (server_id, timestamp, device)
         );
     `);
-
-    // 4. Table for historical wait events
+    // This table now stores EITHER rich ASH data OR simple v$session snapshots
     await dbInstance.exec(`
         CREATE TABLE IF NOT EXISTS wait_events_history (
             server_id TEXT,
             timestamp TEXT,
             event_name TEXT,
             session_count INTEGER,
-            latency_seconds REAL,
+            latency_seconds REAL, -- Will be NULL for v$session snapshots
+            is_snapshot INTEGER DEFAULT 0, -- Flag to distinguish data source
             PRIMARY KEY (server_id, timestamp, event_name)
         );
     `);
-
-    // 5. Indices for performance
     await dbInstance.exec("CREATE INDEX IF NOT EXISTS idx_perf_summary_server_ts ON performance_summary(server_id, timestamp);");
     await dbInstance.exec("CREATE INDEX IF NOT EXISTS idx_perf_io_details_server_ts ON performance_io_details(server_id, timestamp);");
     await dbInstance.exec("CREATE INDEX IF NOT EXISTS idx_wait_events_server_ts ON wait_events_history(server_id, timestamp);");
-    
-    console.log("--- SERVER: Database schema initialized successfully. ---");
+    console.log("--- SERVER: SQLITE HISTORY DATABASE INITIALIZED ---");
 }
 
-
-// --- DATA UPDATE FUNCTIONS ---
-
-/**
- * Stores the full, latest snapshot of a server's data.
- * This should be called by the /api/report endpoint.
- */
-export async function updateLatestServerData(data: DashboardData): Promise<void> {
-    const db = await getDb();
-
-    const params = [
-        data.id, data.dbName, data.timestamp, data.dbIsUp, data.dbStatus, data.osIsUp,
-        JSON.stringify(data.osInfo || null),
-        JSON.stringify(data.host_memory || null),
-        JSON.stringify(data.kpis || null),
-        JSON.stringify(data.topCpuProcesses || []),
-        JSON.stringify(data.topMemoryProcesses || []),
-        JSON.stringify(data.topIoProcesses || []),
-        JSON.stringify(data.topNetworkProcesses || []),
-        JSON.stringify(data.diskUsage || []),
-        JSON.stringify(data.tablespaces || []),
-        JSON.stringify(data.backups || []),
-        JSON.stringify(data.activeSessions || []),
-        JSON.stringify(data.detailedActiveSessions || []),
-        JSON.stringify(data.alertLog || []),
-        JSON.stringify(data.topWaitEvents || []),
-        JSON.stringify(data.standbyStatus || [])
-    ];
-
-    const columns = [
-        'id', 'dbName', 'last_updated', 'dbIsUp', 'dbStatus', 'osIsUp', 'osInfo',
-        'host_memory', 'kpis', 'topCpuProcesses', 'topMemoryProcesses', 'topIoProcesses',
-        'topNetworkProcesses', 'diskUsage', 'tablespaces', 'backups', 'activeSessions',
-        'detailedActiveSessions', 'alertLog', 'topWaitEvents', 'standbyStatus'
-    ];
-    const placeholders = columns.map(() => '?').join(',');
-
-    const sql = `INSERT OR REPLACE INTO servers (${columns.join(',')}) VALUES (${placeholders})`;
-
-    try {
-        await db.run(sql, params);
-        console.log(`--- SERVER: Successfully updated latest data snapshot for ${data.id} ---`);
-    } catch (error) {
-        console.error(`--- SERVER: Failed to update latest data for ${data.id} ---`, error);
-    }
-}
-
-/**
- * Stores aggregated metrics for historical charts.
- */
-export async function storePerformanceMetrics(server_id: string, timestamp: string, data: DashboardData): Promise<void> {
-    const db = await getDb();
-    const perf_data = data.current_performance;
-    
-    await db.run('BEGIN TRANSACTION');
-    try {
-        if (perf_data) {
-            await db.run(
-                `INSERT OR IGNORE INTO performance_summary (server_id, timestamp, cpu_usage, memory_usage, io_read_total, io_write_total, network_up, network_down, active_sessions)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [server_id, timestamp, perf_data.cpu, perf_data.memory, perf_data.io_read, perf_data.io_write, perf_data.network_up, perf_data.network_down, perf_data.active_sessions]
-            );
-        }
-        
-        await db.run('COMMIT');
-    } catch (error) {
-        console.error("--- SERVER: Failed to store historical performance metrics ---", error);
-        await db.run('ROLLBACK');
-    }
-}
-
-
-// --- DATA RETRIEVAL FUNCTIONS ---
-
-/**
- * Retrieves the latest snapshot for a given server.
- * Used to build the main dashboard view.
- */
-export async function getLatestServerData(server_id: string): Promise<DashboardData | null> {
-    const db = await getDb();
-    const row = await db.get("SELECT * FROM servers WHERE id = ?", server_id);
-
-    if (!row) {
-        return null;
-    }
-
-    // The row object from the DB needs to be parsed and cast to the DashboardData type.
-    const data: DashboardData = {
-        id: row.id,
-        dbName: row.dbName,
-        timestamp: row.last_updated,
-        dbIsUp: Boolean(row.dbIsUp),
-        dbStatus: row.dbStatus,
-        osIsUp: Boolean(row.osIsUp),
-        osInfo: JSON.parse(row.osInfo || 'null'),
-        host_memory: JSON.parse(row.host_memory || 'null'),
-        kpis: JSON.parse(row.kpis || 'null'),
-        topCpuProcesses: JSON.parse(row.topCpuProcesses || '[]'),
-        topMemoryProcesses: JSON.parse(row.topMemoryProcesses || '[]'),
-        topIoProcesses: JSON.parse(row.topIoProcesses || '[]'),
-        topNetworkProcesses: JSON.parse(row.topNetworkProcesses || '[]'),
-        diskUsage: JSON.parse(row.diskUsage || '[]'),
-        tablespaces: JSON.parse(row.tablespaces || '[]'),
-        backups: JSON.parse(row.backups || '[]'),
-        activeSessions: JSON.parse(row.activeSessions || '[]'),
-        detailedActiveSessions: JSON.parse(row.detailedActiveSessions || '[]'),
-        alertLog: JSON.parse(row.alertLog || '[]'),
-        topWaitEvents: JSON.parse(row.topWaitEvents || '[]'),
-        standbyStatus: JSON.parse(row.standbyStatus || '[]'),
-        // current_performance is not stored in the main snapshot table, it's for history.
-        current_performance: null 
-    };
-    
-    return data;
-}
-
-/**
- * Retrieves the list of all unique servers that have reported data.
- */
-export async function getAllServerIds(): Promise<{ id: string, dbName: string }[]> {
-    const db = await getDb();
-    return await db.all("SELECT id, dbName FROM servers ORDER BY id ASC");
-}
-
-/**
- * Retrieves historical performance data for the last 24 hours for charts.
- */
-export async function getPerformanceHistory24h(server_id: string): Promise<PerformanceData> {
-    // This function can be expanded later to pull the detailed historical data
-    // For now, it returns an empty structure.
-    const performance_data: PerformanceData = {
-        cpu: [], memory: [], io_read: [], io_write: [], 
-        network_up: [], network_down: [],
-    };
-    return performance_data;
-}
-
-// --- MOCK DATA & PRUNING ---
-// (These can be removed if you are not using mock data)
-
-/**
- * Prunes data older than 24 hours from historical tables.
- */
 async function _prune_old_performance_data() {
     const db = await getDb();
     const one_day_ago = formatISO(subHours(new Date(), 24));
     
-    const result = await db.run("DELETE FROM performance_summary WHERE timestamp < ?", one_day_ago);
-    if ((result.changes || 0) > 0) {
-        console.log(`--- SERVER: Pruned ${result.changes} historical records older than 24 hours. ---`);
+    const summaryResult = await db.run("DELETE FROM performance_summary WHERE timestamp < ?", one_day_ago);
+    const detailsResult = await db.run("DELETE FROM performance_io_details WHERE timestamp < ?", one_day_ago);
+    const waitEventsResult = await db.run("DELETE FROM wait_events_history WHERE timestamp < ?", one_day_ago);
+    
+    const summary_deleted_count = summaryResult.changes || 0;
+    const details_deleted_count = detailsResult.changes || 0;
+    const wait_events_deleted_count = waitEventsResult.changes || 0;
+
+    if (summary_deleted_count > 0 || details_deleted_count > 0 || wait_events_deleted_count > 0) {
+        console.log(`--- SERVER: Pruned ${summary_deleted_count} summary, ${details_deleted_count} detail, and ${wait_events_deleted_count} wait event records older than 24 hours. ---`);
     }
 }
-setInterval(_prune_old_performance_data, 1000 * 60 * 60); // Prune every hour
 
+export async function storePerformanceMetrics(server_id: string, timestamp: string, data: DashboardData) {
+    const db = await getDb();
+    const perf_data = data.current_performance;
+    
+    if (perf_data) {
+        await db.run(
+            `INSERT OR REPLACE INTO performance_summary 
+            (server_id, timestamp, cpu_usage, memory_usage, io_read_total, io_write_total, network_up, network_down, active_sessions)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                server_id,
+                timestamp,
+                perf_data.cpu,
+                perf_data.memory,
+                perf_data.io_read,
+                perf_data.io_write,
+                perf_data.network_up,
+                perf_data.network_down,
+                perf_data.active_sessions
+            ]
+        );
+        
+        const io_details = perf_data.io_details || [];
+        for (const stats of io_details) {
+             await db.run(
+                `INSERT OR REPLACE INTO performance_io_details
+                (server_id, timestamp, device, mount_point, read_mb_s, write_mb_s)
+                VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                    server_id,
+                    timestamp,
+                    stats.device,
+                    stats.mount_point,
+                    stats.read_mb_s,
+                    stats.write_mb_s
+                ]
+            );
+        }
+    }
+    
+    // Store historical wait events (either from ASH or v$session snapshot)
+    const wait_events = data.topWaitEvents || [];
+    for (const event of wait_events) {
+        // ASH data has a 'data' property and comes with its own timestamp
+        if (event.data && event.data.length > 0) { 
+            for (const point of event.data) {
+                // The timestamp from the agent is already in the correct ISO 8601 format.
+                const isoDate = point.date;
+
+                await db.run(
+                    `INSERT OR REPLACE INTO wait_events_history
+                    (server_id, timestamp, event_name, session_count, latency_seconds, is_snapshot)
+                    VALUES (?, ?, ?, ?, ?, 0)`, // is_snapshot = 0 for ASH
+                    [
+                        server_id,
+                        isoDate,
+                        event.event,
+                        point.value,
+                        point.latency
+                    ]
+                );
+            }
+        }
+        // v$session snapshot data does NOT have 'data' property, use the main report timestamp
+        else if (event.value > 0) {
+            await db.run(
+                `INSERT OR REPLACE INTO wait_events_history
+                (server_id, timestamp, event_name, session_count, latency_seconds, is_snapshot)
+                VALUES (?, ?, ?, ?, NULL, 1)`, // is_snapshot = 1 for v$session
+                [
+                    server_id,
+                    timestamp,
+                    event.event,
+                    event.value
+                ]
+            );
+        }
+    }
+    
+    await _prune_old_performance_data();
+}
+
+interface PerformanceHistory extends PerformanceData {
+    activeSessionsHistory: TimeSeriesData[];
+    topWaitEvents: WaitEvent[];
+}
+
+export async function getPerformanceHistory24h(server_id: string): Promise<PerformanceHistory> {
+    const db = await getDb();
+    const one_day_ago = formatISO(subHours(new Date(), 24));
+    
+    const summary_rows = await db.all(
+        `SELECT timestamp, cpu_usage, memory_usage, io_read_total, io_write_total, network_up, network_down, active_sessions
+         FROM performance_summary
+         WHERE server_id = ? AND timestamp >= ?
+         ORDER BY timestamp ASC`,
+        [server_id, one_day_ago]
+    );
+
+    const io_detail_rows = await db.all(
+        `SELECT timestamp, device, mount_point, read_mb_s, write_mb_s
+         FROM performance_io_details
+         WHERE server_id = ? AND timestamp >= ?
+         ORDER BY timestamp ASC`,
+        [server_id, one_day_ago]
+    );
+
+    const wait_event_rows = await db.all(
+        `SELECT timestamp, event_name, session_count, latency_seconds, is_snapshot
+         FROM wait_events_history
+         WHERE server_id = ? AND timestamp >= ?
+         ORDER BY timestamp ASC`,
+        [server_id, one_day_ago]
+    );
+
+    // Process Wait Events
+    const events_by_name: { [key: string]: WaitEvent } = {};
+    for (const row of wait_event_rows) {
+        const event_name = row.event_name;
+        if (!events_by_name[event_name]) {
+            // Initialize with the data key, which is required for the chart component
+            events_by_name[event_name] = { "event": event_name, "value": 0, "data": [] };
+        }
+        
+        // All data, whether from ASH or snapshot, is added to the 'data' array to build the chart
+        events_by_name[event_name].data!.push({
+            date: row.timestamp,
+            value: row.session_count,
+            latency: row.latency_seconds // Will be null for snapshots, which is fine
+        });
+    }
+
+    // For both snapshot and ASH data, we need to sum the values to find the top events
+    for(const eventName in events_by_name) {
+        events_by_name[eventName].value = events_by_name[eventName].data!.reduce((acc, curr) => acc + curr.value, 0);
+    }
+
+    const topWaitEvents = Object.values(events_by_name).sort((a, b) => b.value - a.value);
+
+
+    const io_details_map: { [key: string]: any[] } = {};
+    for (const row of io_detail_rows) {
+        if (!io_details_map[row.timestamp]) {
+            io_details_map[row.timestamp] = [];
+        }
+        io_details_map[row.timestamp].push({
+            'device': row.device,
+            'mount_point': row.mount_point,
+            'read_mb_s': row.read_mb_s,
+            'write_mb_s': row.write_mb_s
+        });
+    }
+
+    const performance_data: PerformanceHistory = {
+        cpu: [], memory: [], io_read: [], io_write: [], 
+        network_up: [], network_down: [], activeSessionsHistory: [],
+        topWaitEvents: topWaitEvents
+    };
+
+    for (const row of summary_rows) {
+        const ts = row.timestamp;
+        performance_data.cpu!.push({ date: ts, value: row.cpu_usage });
+        performance_data.memory!.push({ date: ts, value: row.memory_usage });
+        performance_data.network_up!.push({ date: ts, value: row.network_up });
+        performance_data.network_down!.push({ date: ts, value: row.network_down });
+        performance_data.activeSessionsHistory.push({ date: ts, value: row.active_sessions });
+        performance_data.io_read!.push({
+            date: ts, 
+            value: row.io_read_total,
+            details: io_details_map[ts] || []
+        });
+        performance_data.io_write!.push({
+            date: ts, 
+            value: row.io_write_total,
+            details: io_details_map[ts] || []
+        });
+    }
+
+    return performance_data;
+}
+
+
+// In-memory storage for the latest data from each agent.
+type ServerSnapshot = {
+    data: DashboardData;
+    last_updated: string;
+};
+export const db_data_store: { [key: string]: ServerSnapshot } = {};

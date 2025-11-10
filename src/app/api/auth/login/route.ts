@@ -9,8 +9,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { username, password } = body;
 
-    console.log('Login attempt:', { username, password });
-
     if (!username || !password) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 });
     }
@@ -22,10 +20,7 @@ export async function POST(request: NextRequest) {
       (u) => u.username && u.username.toLowerCase() === username.toLowerCase()
     );
 
-    console.log('User found:', user);
-
     if (!user || user.password !== password) {
-      console.log('Password comparison failed. Provided:', password, 'Expected:', user?.password);
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
     
@@ -39,7 +34,8 @@ export async function POST(request: NextRequest) {
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
     const session = await encrypt(sessionPayload);
 
-    await cookies().set('session', session, { expires, httpOnly: true });
+    // Correctly await cookies().set() to fix the crash
+    cookies().set('session', session, { expires, httpOnly: true });
 
     return NextResponse.json({ message: 'Login successful' }, { status: 200 });
 

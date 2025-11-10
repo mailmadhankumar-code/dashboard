@@ -1,5 +1,4 @@
 
-import { ProcessInfo } from "./process-info";
 
 export interface Database {
   id: string;
@@ -120,15 +119,8 @@ export interface Alert {
 }
 
 export interface OsInfo {
-  platform: string;
-  release: string;
-  uptime: string;
-  totalCpu: number;
-  totalMemory: number;
-  topCpuProcesses: ProcessInfo[];
-  topMemoryProcesses: ProcessInfo[];
-  topNetworkProcesses: ProcessInfo[];
-  topIoProcesses?: ProcessInfo[];
+    platform: string;
+    release: string;
 }
 
 export interface StandbyStatus {
@@ -166,7 +158,7 @@ export interface UserSession {
 
 export interface Settings {
     tablespaceThreshold: number;
-    diskUsageThreshold: number;
+    diskThreshold: number;
     thresholds: {
         cpu: number;
         memory: number;
@@ -212,22 +204,6 @@ export interface DashboardData {
   topWaitEvents: WaitEvent[];
   standbyStatus: StandbyStatus[];
   customers: Customer[];
-  topCpuProcesses?: ProcessInfo[];
-  topMemoryProcesses?: ProcessInfo[];
-  topIoProcesses?: ProcessInfo[];
-}
-
-export interface OverviewRow {
-    id: string;
-    dbName: string;
-    customerName: string;
-    dbIsUp: boolean;
-    osIsUp: boolean;
-    dbStatus: string;
-    cpuUsage: number;
-    memoryUsage: number;
-    activeSessions: number;
-    uptime: string;
 }
 
 // This is the shape of the data coming from the /data endpoint
