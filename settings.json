@@ -74,21 +74,13 @@
           {
             "id": "db5",
             "name": "FREEDOM_PROD"
-          }        ]
-      },
-	{
-        "id": "cust4",
-        "name": "MADHAN",
-        "emails": [
-          "info@krizars.com"
-        ],
-        "databases": [
+          },
           {
             "id": "db6",
-            "name": "MADHAN_PROD"
-          }        ]
+            "name": "FREEDOM_STANDBY"
+          }
+        ]
       },
-
       {
         "id": "cust4",
         "name": "DEMO_CORP",
