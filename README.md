@@ -1,35 +1,77 @@
-    This is generally the cleanest solution as it makes the component more robust and self-contained. You might also want to adjust your `DashboardSidebarProps` interface to reflect that `alerts` is optional or always an array.
 # ProactiveDB Insights
 
 This is a centralized dashboard for monitoring Oracle databases, built with Next.js and a Python data collection agent.
 
 ## Architecture
 
-## Optimize usage
+The project consists of two main components:
 
-There are a few best practices you can employ to optimize your database usage and bandwidth costs.
+1.  **Next.js Application (Dashboard & API):** A web-based dashboard for visualizing database performance metrics. It also includes the backend API that receives data from the agent, stores it, and serves it to the frontend.
+2.  **Python Agent (`agent/agent.py`):** A standalone script that connects to an Oracle database, collects performance metrics from the database and the underlying OS, and sends them to the Next.js API.
 
-#### Recommendation
+## Getting Started
 
-Minimize CPU intensive work in the main thread. Use worker or background threads for performing CPU intensive tasks.
+Follow these steps to set up and run the project. You will need two separate terminal windows: one for the Next.js application and one for the Python agent.
 
-Minimize I/O intensive work, like loading from a database, on the main thread.
+### 1. Configure the Environment
 
-### Memory Optimization
+First, create a local environment file to store your email alert settings.
 
-Here are some more specific recommendations for optimizing memory usage in your application:
+1.  **Copy the template:**
+    ```bash
+    cp .env .env.local
+    ```
+2.  **Edit `.env.local`:**
+    Open the newly created `.env.local` file and fill in your SMTP server details. This is required for the application to send email alerts. If you leave these blank, alerts will only be printed to the console.
 
-**Next.js Frontend:**
+### 2. Run the Next.js Dashboard & API
 
-*   **Component Unmounting:** Ensure that you clean up any event listeners, subscriptions, or timers in the `useEffect` cleanup function to prevent memory leaks when components unmount.
-*   **Virtualize Long Lists:** If you are displaying long lists of data, use a library like `react-window` or `react-virtualized` to only render the items that are currently visible in the viewport. This can significantly reduce memory consumption.
-*   **Code Splitting:** Use Next.js's built-in code splitting by creating pages under the `src/app` directory. This ensures that only the necessary JavaScript for a given page is loaded, reducing the initial memory footprint.
-*   **Image Optimization:** Use the `next/image` component to automatically optimize images, which can help reduce memory usage, especially on pages with many images.
+This part runs the web interface and the backend API endpoints.
 
-**Python Agent:**
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+2.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+    The application will now be running at `http://localhost:5173`. You can open this URL in your web browser.
 
-*   **Efficient Data Structures:** When processing large amounts of data, choose memory-efficient data structures. For example, use generators to iterate over large datasets instead of loading them into memory all at once.
-*   **Garbage Collection:** While Python's automatic garbage collection is usually sufficient, you can explicitly call `gc.collect()` in long-running loops or after processing large objects to free up memory sooner.
-*   **Streaming Data:** When fetching large amounts of data from the database, consider streaming the results instead of fetching everything at once. This can be done with the `cx_Oracle` library by setting `arraysize` on the cursor.
+### 3. Configure and Run the Python Agent
 
-By following these recommendations, you can improve the memory efficiency of your application, leading to better performance and a more stable user experience.
+This script collects and sends the data to your dashboard.
+
+1.  **Navigate to the agent directory:**
+    ```bash
+    cd agent
+    ```
+2.  **Set up a Python virtual environment (recommended):**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate 
+    # On Windows, use `venv\Scripts\activate`
+    ```
+3.  **Install Python dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **Configure Agent Settings:**
+    Open `agent/agent.py` and modify the "Database Connection Configuration" section at the top of the file with your Oracle database credentials.
+
+    ```python
+    # agent/agent.py
+
+    # --- Database Connection Configuration ---
+    DB_HOST = "your_db_host"
+    DB_PORT = 1521
+    DB_SERVICE_NAME = "your_service_name"
+    DB_USER = "your_db_user"
+    DB_PASSWORD = "your_db_password"
+    ```
+5.  **Run the agent:**
+    ```bash
+    python3 agent.py
+    ```
+
+The agent will now start collecting data from your Oracle database every 10 seconds and sending it to the dashboard. You should see the data appear on the web interface at `http://localhost:5173`.

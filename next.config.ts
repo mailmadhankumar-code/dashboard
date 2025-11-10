@@ -30,13 +30,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Exclude sqlite3 from the client-side bundle
-      config.externals.push('sqlite3');
-    }
-    return config;
-  },
 };
 
 export default nextConfig;
